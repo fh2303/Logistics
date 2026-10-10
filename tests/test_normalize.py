@@ -123,6 +123,19 @@ class TestParseDateFlexible:
         d = parse_date_flexible("11-Jul-26 00:00:00")
         assert (d.day, d.month, d.year) == (11, 7, 2026)
 
+    def test_us_dashed_four_digit_year(self):
+        # Eagle arrival notices print dates like 09-10-2026
+        d = parse_date_flexible("09-10-2026")
+        assert (d.day, d.month, d.year) == (10, 9, 2026)
+
+    def test_strips_time_and_timezone(self):
+        d = parse_date_flexible("09-28-2026 11:52 (EDT)")
+        assert (d.day, d.month, d.year) == (28, 9, 2026)
+
+    def test_uppercase_month_name(self):
+        d = parse_date_flexible("06-SEP-2026")  # ISF style
+        assert (d.day, d.month, d.year) == (6, 9, 2026)
+
     def test_legacy_mm_dd_yy_format(self):
         d = parse_date_flexible("02-16-01")
         assert (d.day, d.month, d.year) == (16, 2, 2001)

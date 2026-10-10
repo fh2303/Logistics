@@ -70,7 +70,10 @@ def parse_date_flexible(raw_date: str) -> datetime | None:
 
     # Strip a trailing time component if present, e.g. "11-Jul-26 00:00"
     # -> "11-Jul-26" — we only care about the date part here.
-    raw_date = re.sub(r"\s+\d{1,2}:\d{2}(:\d{2})?$", "", raw_date)
+    # Also drops a trailing timezone like "(EDT)" or "EST".
+    raw_date = re.sub(
+        r"\s+\d{1,2}:\d{2}(:\d{2})?(\s*\(?[A-Za-z]{2,5}\)?)?$", "", raw_date
+    )
 
     formats = [
         "%d-%b-%y",      # 11-Jul-26
@@ -80,6 +83,7 @@ def parse_date_flexible(raw_date: str) -> datetime | None:
         "%Y-%m-%d",      # 2026-07-11
         "%B %d, %Y",     # July 11, 2026
         "%m-%d-%y",      # 02-16-01 (legacy sample doc)
+        "%m-%d-%Y",      # 09-10-2026 (US-style, printed by Eagle arrival notices)
     ]
 
     for fmt in formats:

@@ -174,7 +174,11 @@ BOL_SCHEMA = {
         # would put the wrong number on the form.
         "master_bol_number": {
             "type": "string",
-            "description": "Master/Ocean Bill of Lading number — the carrier's own B/L, e.g. an 'Ocean Bill of Lading' field",
+            "description": "Whatever the document labels as the Master / Ocean B/L (or MBL NO.), exactly as written — even if it looks like an internal file number. Code decides later which number is the real master.",
+        },
+        "ams_bol_number": {
+            "type": "string",
+            "description": "The number labelled 'AMS B/L NO.' or 'AMS HBL', exactly as written. Leave empty if there is none.",
         },
         "house_bol_number": {
             "type": "string",
@@ -185,12 +189,24 @@ BOL_SCHEMA = {
         "shipment_reference": {"type": "string"},
         # Carrier / routing
         "carrier_name": {"type": "string"},
-        "flight_or_voyage_number": {"type": "string"},
+        "flight_or_voyage_number": {
+            "type": "string",
+            "description": "Air: the flight number (e.g. 'MU589'). Ocean: the vessel and voyage exactly as written (e.g. 'CMA CGM PEGASUS 0P52KE1MA' or 'COSCO DEVELOPMENT / 081E').",
+        },
+        "service_type": {
+            "type": "string",
+            "description": "Ocean load/service type as written, e.g. 'FCL', 'LCL', 'CFS/CFS', 'CY/CY'. Empty if not stated.",
+        },
+        "container_numbers": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Every container number listed on the document.",
+        },
         "port_or_airport_of_loading": {"type": "string"},
         "port_or_airport_of_discharge": {"type": "string"},
         "location_of_goods_code": {
             "type": "string",
-            "description": "FIRMS code or similar facility/location code, if present",
+            "description": "FIRMS code of the place where the goods are available / picked up. Labels vary: 'Goods available at', 'Freight pickup location', 'Devan location'. Empty if absent.",
         },
         # Cargo — a document can have multiple line items (different
         # goods, different weights/quantities per row). Extract each
@@ -215,7 +231,18 @@ BOL_SCHEMA = {
         "total_weight": {"type": "string", "description": "raw value + unit as written"},
         # Dates
         "document_date": {"type": "string", "description": "raw date as written in the document"},
-        "estimated_arrival_date": {"type": "string", "description": "raw date as written"},
+        "estimated_arrival_date": {
+            "type": "string",
+            "description": "ETA at the port/airport of DISCHARGE, raw as written. NOT the 'delivery ETA' or 'final destination ETA'.",
+        },
+        "prepared_date": {
+            "type": "string",
+            "description": "The date this document itself was prepared/issued (e.g. 'Prepared by ... 09-28-2026'), raw as written. Used to tell document versions apart.",
+        },
+        "hts_code": {
+            "type": "string",
+            "description": "HTS/HS number, only if one is printed on the document.",
+        },
     },
     "required": [
         "document_type",
@@ -232,6 +259,24 @@ MASTER_HOUSE_BOL_INSTRUCTION = (
     "Ocean Bill of Lading) and house_bol_number (the forwarder's House "
     "Bill of Lading) separately if both appear — they are different "
     "numbers, not the same number under different names. "
+)
+
+
+# Shared by Gemini and Groq so the two prompts can't drift apart.
+FIELD_GUIDANCE_INSTRUCTION = (
+    "Field guidance: put whatever the document labels as the Master/Ocean "
+    "B/L (MBL) in master_bol_number exactly as written, even if it looks "
+    "like an internal file number, and put a separately labelled AMS B/L "
+    "number in ams_bol_number. For flight_or_voyage_number give the flight "
+    "number for air, or the vessel and voyage exactly as written for "
+    "ocean. Put the load type (FCL, LCL, CFS/CFS, CY/CY) in service_type "
+    "and list every container number in container_numbers. "
+    "estimated_arrival_date is the ETA at the port or airport of "
+    "discharge only, not a delivery or final-destination ETA. "
+    "location_of_goods_code is the FIRMS code of the place the goods are "
+    "available or picked up. prepared_date is the date the document "
+    "itself was prepared. Fill hts_code only if an HTS/HS number is "
+    "printed. "
 )
 
 
@@ -262,6 +307,7 @@ def extract_with_gemini(markdown: str) -> dict:
                 "use information present in the text; never guess or "
                 "infer a value that isn't explicitly there. "
                 + MASTER_HOUSE_BOL_INSTRUCTION
+                + FIELD_GUIDANCE_INSTRUCTION
             ),
             "response_mime_type": "application/json",
             "response_schema": BOL_SCHEMA,
@@ -299,7 +345,8 @@ def extract_with_groq(markdown: str) -> dict:
                     "dates yourself. "
                     "Only use information present in the text; never guess "
                     "or infer a value that isn't explicitly there. "
-                    + MASTER_HOUSE_BOL_INSTRUCTION +
+                    + MASTER_HOUSE_BOL_INSTRUCTION
+                    + FIELD_GUIDANCE_INSTRUCTION +
                     "Respond with ONLY valid JSON matching this schema, no "
                     "other text:\n" + json.dumps(BOL_SCHEMA)
                 ),
