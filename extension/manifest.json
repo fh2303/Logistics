@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "BOL Auto-Fill (dev)",
+  "version": "0.1.0",
+  "description": "Extracts shipment data from a document and prepares it for NetCHB entry.",
+  "action": {},
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "host_permissions": ["http://127.0.0.1:8000/*", "https://www.netchb.com/*"],
+  "permissions": ["tabs"],
+  "content_scripts": [
+    {
+      "matches": ["https://www.netchb.com/app/entry/*"],
+      "js": ["content.js"]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+bol1.webp
+bol2.pdf
+Sample_BOL.pdf
+
+/random
+/docs
+
+__pycache__/
+*.pyc
+.vscode/
+
+.env
+
+documents.db
+venv/
+.venv/
