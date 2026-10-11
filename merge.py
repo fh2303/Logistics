@@ -131,9 +131,12 @@ def _date_key(s: str) -> str:
     return dt.date().isoformat() if dt else _text_key(s)
 
 
+def _compact(s: str) -> str:
+    return _text_key(s).replace(" ", "")
+
 def _same(field: str, a: str, b: str) -> bool:
     if field in NAME_FIELDS:
-        return _name_key(a) == _name_key(b)
+        return _name_key(a).replace(" ", "") == _name_key(b).replace(" ", "")
     if field in ID_FIELDS:
         return normalize_number(a) == normalize_number(b)
     if field in DATE_FIELDS:
@@ -141,9 +144,9 @@ def _same(field: str, a: str, b: str) -> bool:
     if field in WEIGHT_FIELDS:
         wa, wb = extract_weight_kg(a), extract_weight_kg(b)
         if wa is None or wb is None:
-            return _text_key(a) == _text_key(b)
+            return _compact(a) == _compact(b)
         return abs(wa - wb) <= max(0.5, 0.005 * max(wa, wb))
-    return _text_key(a) == _text_key(b)
+    return _compact(a) == _compact(b)
 
 
 def _prepare(documents) -> list[dict]:

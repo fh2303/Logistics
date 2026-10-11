@@ -168,7 +168,7 @@ def map_to_netchb_fields(normalized: dict) -> dict:
         "vNo": voyage,                                        # Voyage/Flight No
         # Date of Import: still taken from the document's own date. Which date
         # the client wants here is an open question (see SKILL.md).
-        "dImp": mmddyy(normalized.get("document_date_parsed")),
+        "dImp": "",  # open client question: which date is Date of Import? //mmddyy(normalized.get("estimated_arrival_date_parsed"))
         "eArrive": mmddyy(normalized.get("estimated_arrival_date_parsed")),
         # "pEntry" (Port of Entry) intentionally omitted — this isn't
         # something that comes from a shipping document; it's tied to
