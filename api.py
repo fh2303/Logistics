@@ -32,8 +32,9 @@ thin wrappers.
 
 import tempfile
 import os
+import re
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Query
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -57,15 +58,58 @@ EXTRACTION_VERSION = 2
 
 app = FastAPI(title="BOL Extraction API")
 
-# Allows the browser extension (a different origin: chrome-extension://...)
-# to call this API. Wide open for local development — worth tightening
-# before this is ever exposed beyond your own machine.
+# ---------------------------------------------------------------------------
+# Who may call this API
+# ---------------------------------------------------------------------------
+# Only the browser extension and this server's own /docs page.
+#
+# Set ALLOWED_ORIGINS to pin exact extension origins once the IDs are known
+# (comma-separated), e.g.
+#   ALLOWED_ORIGINS=chrome-extension://abcdefghijklmnopabcdefghijklmnop
+# Unset, any Chrome or Firefox extension origin is accepted, which still shuts
+# out ordinary websites.
+#
+# CORS alone only stops other sites READING responses; a plain multipart POST
+# from any page is still sent. The origin check below rejects those requests
+# outright, so a random web page can't create shipments or trigger LLM calls.
+
+_SELF_ORIGINS = {"http://127.0.0.1:8000", "http://localhost:8000"}
+_EXTENSION_ORIGIN = re.compile(
+    r"^(chrome-extension://[a-p]{32}|moz-extension://[0-9a-f-]{36})$"
+)
+_PINNED_ORIGINS = {
+    o.strip().rstrip("/")
+    for o in os.environ.get("ALLOWED_ORIGINS", "").split(",")
+    if o.strip()
+}
+
+
+def origin_allowed(origin: str) -> bool:
+    if origin in _SELF_ORIGINS:
+        return True
+    if _PINNED_ORIGINS:
+        return origin in _PINNED_ORIGINS
+    return bool(_EXTENSION_ORIGIN.match(origin))
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=sorted(_SELF_ORIGINS | _PINNED_ORIGINS),
+    allow_origin_regex=None if _PINNED_ORIGINS else _EXTENSION_ORIGIN.pattern,
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Content-Type"],
+    allow_credentials=False,
 )
+
+
+# Registered after CORSMiddleware, so it runs first (outermost).
+@app.middleware("http")
+async def reject_foreign_origins(request: Request, call_next):
+    origin = request.headers.get("origin")
+    # No Origin header = not a browser cross-site request (curl, scripts).
+    if origin is not None and not origin_allowed(origin):
+        return JSONResponse({"detail": "Origin not allowed"}, status_code=403)
+    return await call_next(request)
 
 
 @app.on_event("startup")
@@ -129,7 +173,9 @@ def extract_fields(file_bytes: bytes, filename: str | None, mode: str):
 
 
 def _read_upload(file: UploadFile) -> bytes:
-    file_bytes = file.read()
+    # UploadFile.read() is async; the routes are sync (so FastAPI runs them in
+    # a thread pool), so read the underlying file object directly.
+    file_bytes = file.file.read()
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
     return file_bytes
