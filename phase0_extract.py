@@ -322,7 +322,7 @@ def extract_with_groq(markdown: str) -> dict:
     client = Groq()  # reads GROQ_API_KEY from env
 
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model=os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
         messages=[
             {
                 "role": "system",
